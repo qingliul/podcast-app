@@ -1,0 +1,11 @@
+.git/
+node_modules/
+*.log
+AppData/
+Local/
+Roaming/
+Temp/
+.clash_win/
+.DS_Store
+*.tmp
+*.temp

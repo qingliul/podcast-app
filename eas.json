@@ -1,0 +1,25 @@
+{
+  "build": {
+    "preview": {
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "autoIncrement": true,
+        "image": "latest"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "apk", 
+        "gradleCommand": ":app:assembleRelease",
+        "autoIncrement": true,
+        "image": "latest"
+      }
+    }
+  },
+  "cli": {
+    "requireCommit": false,
+    "appVersionSource": "local",
+    "promptToConfigurePushNotifications": false
+  }
+}

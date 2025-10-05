@@ -1,0 +1,56 @@
+{
+  "expo": {
+    "name": "podcast-app",
+    "slug": "podcast-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": false,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "This app uses the microphone for audio recording features.",
+        "NSAppleMusicUsageDescription": "This app needs access to music library for audio playback."
+      }
+    },
+    "android": {
+      "package": "com.lqlqlll.podcastapp",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "versionCode": 3
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone for audio recording.",
+          "backgroundAudioPermissions": [
+            "Allow $(PRODUCT_NAME) to play audio in background."
+          ]
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "0f9153f0-ff3f-4e01-9da4-3a7b0ff38210"
+      }
+    },
+    "owner": "lqlqlll"
+  }
+}
