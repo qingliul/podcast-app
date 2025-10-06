@@ -1,6 +1,5 @@
 // src/screens/DiscoveryScreen.js
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-
 import {
   View,
   Text,
@@ -15,7 +14,8 @@ import {
   Dimensions,
   StatusBar,
   Modal,
-  Alert
+  Alert,
+  Platform // 添加 Platform 导入
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -185,18 +185,20 @@ export default function DiscoveryScreen({ navigation }) {
   const { subscribeToPodcast, unsubscribeFromPodcast, isSubscribed } = useSubscription(); 
   const { toggleFavorite, isFavorited } = useFavorites();
 
+  // Web 平台特定的修复
+  const isWeb = Platform.OS === 'web';
   // 动画值
   const headerOpacity = scrollY.interpolate({
-  inputRange: [0, 40, 80], // 降低触发阈值
-  outputRange: [0, 0.6, 0.6],
-  extrapolate: 'clamp',
-});
+    inputRange: [0, 40, 80],
+    outputRange: [0, 0.6, 0.6],
+    extrapolate: 'clamp',
+  });
 
   const headerTranslateY = scrollY.interpolate({
-  inputRange: [0, 100], // 降低触发阈值
-  outputRange: [0, -10],
-  extrapolate: 'clamp',
-});
+    inputRange: [0, 100],
+    outputRange: [0, -10],
+    extrapolate: 'clamp',
+  });
 
   // 精选播客
   const featuredPodcasts = useMemo(() => 
@@ -309,11 +311,80 @@ export default function DiscoveryScreen({ navigation }) {
   const handleFavorite = (podcast) => {
     toggleFavorite(podcast);
   };
+  // 修复：Web 平台搜索框点击处理
+   const handleSearchContainerPress = () => {
+    if (isWeb) {
+      // 强制聚焦到输入框
+      setTimeout(() => {
+        if (searchInputRef.current) {
+          searchInputRef.current.focus();
+        }
+      }, 0);
+    }
+  };
 
+  // 修复：Web 平台输入框焦点处理
+  const handleSearchFocus = () => {
+    setIsSearchFocused(true);
+    setShowSearchHistory(true);
+    // Web 平台特定：确保键盘不会影响布局
+    if (isWeb) {
+      setTimeout(() => {
+        // 在 Web 上，滚动到搜索框位置
+        searchInputRef.current?.measure((x, y, width, height, pageX, pageY) => {
+          if (pageY < 100) {
+            // 如果搜索框在视图顶部，轻微滚动
+            scrollY.setValue(Math.max(0, scrollY._value - 50));
+          }
+        });
+      }, 100);
+    }
+  };
+
+  // 修复：Web 平台输入框失去焦点处理
+  const handleSearchBlur = () => {
+    // 在 Web 上增加延迟，确保点击事件能正常处理
+    setTimeout(() => {
+      setIsSearchFocused(false);
+      setShowSearchHistory(false);
+    }, isWeb ? 300 : 200);
+  };
+
+  // 修复：Web 平台清除搜索
+  const handleClearSearch = (e) => {
+    if (isWeb && e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    setSearchText('');
+    setShowSearchResults(false);
+    setShowSearchHistory(false);
+  };
+
+  // 修复：Web 平台麦克风按钮点击
+  const handleMicPress = (e) => {
+    if (isWeb && e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    searchInputRef.current?.focus();
+  };
+
+  // 修复：Web 平台搜索历史项点击
+  const handleSearchFromHistory = (term, e) => {
+    if (isWeb && e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    setSearchText(term);
+    addToSearchHistory(term);
+    setShowSearchResults(true);
+    setShowSearchHistory(false);
+    searchInputRef.current?.blur();
+  };
   // 添加到播放列表
   const handleAddToPlaylist = (podcast) => {
     addToPlaylist(podcast);
-    // 显示添加成功提示
     Alert.alert('成功', `"${podcast.title}" 已添加到播放列表`);
   };
 
@@ -390,20 +461,8 @@ export default function DiscoveryScreen({ navigation }) {
   const renderPodcastItem = ({ item, index }) => {
     const subscribed = isSubscribed(item.id);
     const favorited = isFavorited(item.id);
-    
-    const translateY = scrollY.interpolate({
-      inputRange: [-1, 0, 120 * index, 120 * (index + 3)],
-      outputRange: [0, 0, 0, 10],
-    });
-
-    const opacity = scrollY.interpolate({
-      inputRange: [-1, 0, 120 * index, 120 * (index + 2)],
-      outputRange: [1, 1, 1, 0.5],
-    });
 
     return (
-       
-      // 移除 Animated.View，使用普通 View
       <View>
         <TouchableOpacity 
           style={[styles.podcastItem, { backgroundColor: colors.card }]}
@@ -464,17 +523,17 @@ export default function DiscoveryScreen({ navigation }) {
               />
             </TouchableOpacity>
             <TouchableOpacity 
-  style={styles.actionButton}
-  onPress={() => navigation.navigate('Comments', { 
-    episodeId: item.id, 
-    episodeTitle: item.title 
-  })}
->
-  <Ionicons name="chatbubble-outline" size={20} color={colors.textSecondary} />
-  <Text style={[styles.commentCount, { color: colors.textSecondary }]}>
-    {getCommentCount(item.id)}
-  </Text>
-</TouchableOpacity>
+              style={styles.actionButton}
+              onPress={() => navigation.navigate('Comments', { 
+                episodeId: item.id, 
+                episodeTitle: item.title 
+              })}
+            >
+              <Ionicons name="chatbubble-outline" size={20} color={colors.textSecondary} />
+              <Text style={[styles.commentCount, { color: colors.textSecondary }]}>
+                {getCommentCount(item.id)}
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity 
               style={styles.actionButton}
               onPress={() => handleSubscribe(item)}
@@ -505,7 +564,6 @@ export default function DiscoveryScreen({ navigation }) {
     );
   };
 
-
   // 渲染搜索历史项
   const renderSearchHistoryItem = ({ item }) => (
     <TouchableOpacity
@@ -523,7 +581,7 @@ export default function DiscoveryScreen({ navigation }) {
           const newHistory = searchHistory.filter(history => history !== item);
           setSearchHistory(newHistory);
         }}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
       >
         <Ionicons name="close" size={16} color={colors.textSecondary} />
       </TouchableOpacity>
@@ -636,16 +694,22 @@ export default function DiscoveryScreen({ navigation }) {
         }
         contentContainerStyle={styles.scrollContent}
       >
-        {/* 搜索栏 */}
-        <View style={[styles.searchSection, { paddingHorizontal: spacing.md }]}>
+        <View style={styles.searchSection}>
+        {/* 添加 TouchableOpacity 包装搜索容器 */}
+        <TouchableOpacity 
+          activeOpacity={1}
+          onPress={handleSearchContainerPress}
+          style={styles.searchTouchable}
+        >
           <View style={[styles.searchContainer, { 
             backgroundColor: colors.card,
             borderRadius: borderRadius.lg 
-          }]}>
+          }]}
+          onClick={isWeb ? handleSearchContainerPress : undefined}>
             <Ionicons name="search" size={20} color={colors.textSecondary} />
             <TextInput
               ref={searchInputRef}
-              style={[styles.searchInput, { 
+              style={[styles.searchInput, {
                 color: colors.text,
                 marginLeft: spacing.sm,
                 marginRight: spacing.sm,
@@ -655,53 +719,83 @@ export default function DiscoveryScreen({ navigation }) {
               value={searchText}
               onChangeText={handleSearch}
               onSubmitEditing={performSearch}
-              onFocus={() => {
-                setIsSearchFocused(true);
-                setShowSearchHistory(true);
-              }}
-              onBlur={() => setTimeout(() => {
-                setIsSearchFocused(false);
-                setShowSearchHistory(false);
-              }, 200)}
+              onFocus={handleSearchFocus}
+              onBlur={handleSearchBlur}
               returnKeyType="search"
+              // Web 特定属性
+              pointerEvents="box-only"
             />
             {searchText ? (
-              <TouchableOpacity onPress={clearSearch} hitSlop={10}>
+              <TouchableOpacity 
+                onPress={handleClearSearch} 
+                hitSlop={10}
+                style={styles.searchIconButton}
+              >
                 <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             ) : (
-              <TouchableOpacity onPress={() => searchInputRef.current?.focus()} hitSlop={10}>
+              <TouchableOpacity 
+                onPress={handleMicPress} 
+                hitSlop={10}
+                style={styles.searchIconButton}
+              >
                 <Ionicons name="mic-outline" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             )}
           </View>
+        </TouchableOpacity>
 
-          {/* 搜索历史 */}
-          {showSearchHistory && searchHistory.length > 0 && (
-            <View style={[styles.searchHistory, { backgroundColor: colors.card }]}>
-              <View style={styles.searchHistoryHeader}>
-                <Text style={[styles.searchHistoryTitle, { color: colors.text }]}>
-                  搜索历史
+        {/* 搜索历史部分也需要修复 */}
+        {showSearchHistory && searchHistory.length > 0 && (
+          <View style={[styles.searchHistory, { backgroundColor: colors.card }]}>
+            <View style={styles.searchHistoryHeader}>
+              <Text style={[styles.searchHistoryTitle, { color: colors.text }]}>
+                搜索历史
+              </Text>
+              <TouchableOpacity 
+                onPress={clearSearchHistory}
+                style={styles.clearHistoryButton}
+              >
+                <Text style={[styles.clearHistoryText, { color: colors.textSecondary }]}>
+                  清空
                 </Text>
-                <TouchableOpacity onPress={clearSearchHistory}>
-                  <Text style={[styles.clearHistoryText, { color: colors.textSecondary }]}>
-                    清空
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              <FlatList
-                data={searchHistory}
-                renderItem={renderSearchHistoryItem}
-                keyExtractor={(item, index) => index.toString()}
-                scrollEnabled={false}
-              />
+              </TouchableOpacity>
             </View>
-          )}
-        </View>
+            <FlatList
+              data={searchHistory}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[styles.searchHistoryItem, { borderBottomColor: colors.border }]}
+                  onPress={(e) => handleSearchFromHistory(item, e)}
+                  activeOpacity={0.6}
+                >
+                  <Ionicons name="time-outline" size={18} color={colors.textSecondary} />
+                  <Text style={[styles.searchHistoryText, { color: colors.text }]} numberOfLines={1}>
+                    {item}
+                  </Text>
+                  <TouchableOpacity 
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      const newHistory = searchHistory.filter(history => history !== item);
+                      setSearchHistory(newHistory);
+                    }}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    style={styles.removeHistoryButton}
+                  >
+                    <Ionicons name="close" size={16} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              )}
+              keyExtractor={(item, index) => index.toString()}
+              scrollEnabled={false}
+            />
+          </View>
+        )}
+      </View>
 
         {/* 标签页切换 */}
         {!showSearchResults && (
-          <View style={[styles.tabSection, { paddingHorizontal: spacing.md }]}>
+          <View style={styles.tabSection}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.tabContainer}>
                 {[
@@ -742,7 +836,7 @@ export default function DiscoveryScreen({ navigation }) {
         {showSearchResults ? (
           // 搜索结果
           <View style={styles.resultsSection}>
-            <View style={[styles.sectionHeader, { paddingHorizontal: spacing.md }]}>
+            <View style={styles.sectionHeader}>
               <View>
                 <Text style={[typography.subtitle, { color: colors.text }]}>
                   搜索结果
@@ -767,7 +861,7 @@ export default function DiscoveryScreen({ navigation }) {
               renderItem={renderPodcastItem}
               keyExtractor={item => item.id}
               scrollEnabled={false}
-              contentContainerStyle={[styles.podcastsList, { paddingHorizontal: spacing.md }]}
+              contentContainerStyle={styles.podcastsList}
               ListEmptyComponent={
                 <View style={styles.emptyState}>
                   <Ionicons name="search-outline" size={80} color={colors.textSecondary} />
@@ -787,7 +881,7 @@ export default function DiscoveryScreen({ navigation }) {
             {/* 精选推荐 */}
             {activeTab === 'featured' && (
               <View style={styles.featuredSection}>
-                <View style={[styles.sectionHeader, { paddingHorizontal: spacing.md }]}>
+                <View style={styles.sectionHeader}>
                   <Text style={[typography.subtitle, { color: colors.text }]}>
                     精选推荐
                   </Text>
@@ -814,7 +908,7 @@ export default function DiscoveryScreen({ navigation }) {
             {/* 热门榜单 */}
             {activeTab === 'trending' && (
               <View style={styles.trendingSection}>
-                <View style={[styles.sectionHeader, { paddingHorizontal: spacing.md }]}>
+                <View style={styles.sectionHeader}>
                   <Text style={[typography.subtitle, { color: colors.text }]}>
                     热门榜单
                   </Text>
@@ -829,7 +923,7 @@ export default function DiscoveryScreen({ navigation }) {
                   renderItem={renderTrendingPodcast}
                   keyExtractor={item => item.id}
                   scrollEnabled={false}
-                  contentContainerStyle={[styles.trendingList, { paddingHorizontal: spacing.md }]}
+                  contentContainerStyle={styles.trendingList}
                 />
               </View>
             )}
@@ -839,7 +933,6 @@ export default function DiscoveryScreen({ navigation }) {
               <View style={styles.categoriesSection}>
                 <Text style={[typography.subtitle, { 
                   color: colors.text,
-                  paddingHorizontal: spacing.md,
                   marginBottom: spacing.md 
                 }]}>
                   分类浏览
@@ -850,14 +943,14 @@ export default function DiscoveryScreen({ navigation }) {
                   keyExtractor={item => item.id}
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={[styles.categoriesList, { paddingHorizontal: spacing.md }]}
+                  contentContainerStyle={styles.categoriesList}
                 />
               </View>
             )}
 
             {/* 推荐播客列表 */}
             <View style={styles.podcastsSection}>
-              <View style={[styles.sectionHeader, { paddingHorizontal: spacing.md }]}>
+              <View style={styles.sectionHeader}>
                 <Text style={[typography.subtitle, { color: colors.text }]}>
                   {activeTab === 'featured' ? '热门播客' : 
                    activeTab === 'trending' ? '更多推荐' : '全部播客'}
@@ -874,7 +967,7 @@ export default function DiscoveryScreen({ navigation }) {
                 renderItem={renderPodcastItem}
                 keyExtractor={item => item.id}
                 scrollEnabled={false}
-                contentContainerStyle={[styles.podcastsList, { paddingHorizontal: spacing.md }]}
+                contentContainerStyle={styles.podcastsList}
               />
             </View>
           </View>
@@ -893,16 +986,16 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingTop: StatusBar.currentHeight + 10,
+    paddingTop: StatusBar.currentHeight + 80,
   },
   animatedHeader: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 100,
-    zIndex: 1000,
-    paddingTop: 50,
+    height: 80,
+    zIndex: 999,
+    paddingTop: 40,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
@@ -915,15 +1008,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   headerButton: {
-    padding: 4,
+    padding: 8,
   },
   searchSection: {
     marginBottom: 24,
+    paddingHorizontal: 16,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -933,6 +1027,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
+    paddingVertical: 8,
   },
   searchHistory: {
     marginTop: 8,
@@ -971,6 +1066,7 @@ const styles = StyleSheet.create({
   },
   tabSection: {
     marginBottom: 24,
+    paddingHorizontal: 16,
   },
   tabContainer: {
     flexDirection: 'row',
@@ -1071,6 +1167,7 @@ const styles = StyleSheet.create({
   },
   trendingList: {
     gap: 12,
+    paddingHorizontal: 16,
   },
   trendingItem: {
     flexDirection: 'row',
@@ -1117,6 +1214,7 @@ const styles = StyleSheet.create({
   },
   categoriesSection: {
     marginBottom: 32,
+    paddingHorizontal: 16,
   },
   categoriesList: {
     gap: 12,
@@ -1148,6 +1246,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+    paddingHorizontal: 16,
   },
   resultsCount: {
     fontSize: 12,
@@ -1171,6 +1270,7 @@ const styles = StyleSheet.create({
   },
   podcastsList: {
     gap: 16,
+    paddingHorizontal: 16,
   },
   podcastItem: {
     flexDirection: 'row',
@@ -1245,10 +1345,6 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 6,
   },
-  categoryText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
   actionButtons: {
     alignItems: 'center',
     gap: 12,
@@ -1268,6 +1364,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  commentCount: {
+    fontSize: 10,
+    marginTop: 2,
+  },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 80,
@@ -1284,5 +1384,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  resultsSection: {
+    marginBottom: 20,
+  },
+  contentSection: {
+    marginBottom: 20,
+  },
+searchTouchable: {
+    // 确保触摸区域正确
+  },
+  searchIconButton: {
+    // 确保图标按钮有合适的点击区域
+    padding: 4,
+  },
+  clearHistoryButton: {
+    padding: 4,
+  },
+  removeHistoryButton: {
+    padding: 2,
   },
 });

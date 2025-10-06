@@ -9,11 +9,11 @@ import {
   Image,
   RefreshControl
 } from 'react-native';
-import { useTheme } from '../context/ThemeContext';
+
 import { Ionicons } from '@expo/vector-icons';
 import { useFavorites } from '../context/FavoritesContext';
 import { usePlayer } from '../context/PlayerContext';
-
+import { useTheme } from '../context/ThemeContext';
 export default function FavoritesScreen() {
   const { colors } = useTheme();
   const { 
